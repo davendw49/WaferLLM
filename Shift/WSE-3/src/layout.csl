@@ -37,7 +37,7 @@ layout {
 
             @set_tile_code(px, py, "shift.csl", .{
                 .memcpy_params = memcpy_params,
-                .comm_params = @concat_structs(comm_even, .left_bd_color = C_L_B),
+                .comm_params = @concat_structs(comm_even, .{.left_bd_color = C_L_B}),
                 .P = P, .L = L, .Mt = Mt, .Nt = Nt,
             });
 
@@ -67,7 +67,7 @@ layout {
 
             @set_tile_code(px, py, "shift.csl", .{
                 .memcpy_params = memcpy_params,
-                .comm_params = @concat_structs(comm_odd, .left_bd_color = C_L_B),
+                .comm_params = @concat_structs(comm_odd, .{.left_bd_color = C_L_B}),
                 .P = P, .L = L, .Mt = Mt, .Nt = Nt,
             });
 
@@ -96,8 +96,4 @@ layout {
     @export_name("shift_host", fn(i16, i16)void);
 
     @export_name("time_memcpy", [*]f32, true);
-    @export_name("time_ref", [*]f32, true);
-    
-    @export_name("f_memcpy_timestamps", fn()void);
-    @export_name("f_reference_timestamps", fn()void);
 }

@@ -1,31 +1,30 @@
 param memcpy_params: comptime_struct;
 param comm_params: comptime_struct;
 
-param P: i16;
-param L: i16;
-param Mt: i16;
-param Nt: i16;
+param P_1: i16;
+param P_2: i16;
+param Mt_1: i16;
+param Nt_1: i16;
+param Mt_2: i16;
+param Nt_2: i16;
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
 const layout_module = @import_module("<layout>");
 
 const comm_mod = @import_module("comm_lib/comm_pe.csl", @concat_structs(comm_params, .{
-    .P = P, .L = L, .Mt = Mt, .Nt = Nt, 
+    .P_1 = P_1, .P_2 = P_2, .Mt_1 = Mt_1, .Nt_1 = Nt_1, .Mt_2 = Mt_2, .Nt_2 = Nt_2,
 }));
 
 var px: i16 = 0;
 var py: i16 = 0;
 
-var W_tile: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
-var ptr_W: [*]f16 = &W_tile;
-var W_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> W_tile[i] });
+var W_1_tile: [Mt_1*Nt_1]f16 = @zeros([Mt_1*Nt_1]f16);
+var ptr_W_1: [*]f16 = &W_1_tile;
+var W_1_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt_1*Nt_1} -> W_1_tile[i] });
 
-var tmp_tile: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
-var ptr_tmp: [*]f16 = &tmp_tile;
-var tmp_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> tmp_tile[i] });
-
-var res_tile: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
-var ptr_res: [*]f16 = &res_tile;
+var W_2_tile: [Mt_2*Nt_2]f16 = @zeros([Mt_2*Nt_2]f16);
+var ptr_W_2: [*]f16 = &W_2_tile;
+var W_2_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt_2*Nt_2} -> W_2_tile[i] });
 
 const timestamp = @import_module("<time>");
 var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
@@ -35,7 +34,7 @@ var ptr_time_memcpy: [*]f32 = &time_buf_f32;
 
 fn init_task() void {
     timestamp.enable_tsc();
-    @assert(P >= 3);
+    @assert(P_2 >= P_1);
     px = @as(i16, layout_module.get_x_coord());
     py = @as(i16, layout_module.get_y_coord());
   
@@ -43,11 +42,10 @@ fn init_task() void {
     sys_mod.unblock_cmd_stream();
 }
 
-fn shift_communication() void {
-    @fmovh(tmp_dsd, W_dsd);
-    comm_mod.right_matrix_shift(ptr_tmp, ptr_res);
-    comm_mod.left_broadcast();
-    shift_entry();
+fn resize_communication() void {
+    comm_mod.right_resize();
+    comm_mod.left_resize();
+    resize_entry();
 }
 
 var total_repeat_times: i16 = 1;
@@ -55,16 +53,16 @@ var total_warmup_times: i16 = 0;
 
 var repeat_times: i16 = 0; // Start from 0
 
-fn shift_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+fn resize_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
     total_repeat_times = total_repeat_times_;
     total_warmup_times = total_warmup_times_;
 
     repeat_times = 0;
 
-    shift_entry();
+    resize_entry();
 }
 
-fn shift_entry() void {
+fn resize_entry() void {
 
     // Run (total_warmup_times + total_repeat_times) times; only the last `total_repeat_times` iterations are timed
     if (repeat_times == total_repeat_times + total_warmup_times) {
@@ -75,7 +73,7 @@ fn shift_entry() void {
         }
 
         repeat_times += 1;
-        shift_communication();
+        resize_communication();
     }
 }
 
@@ -110,7 +108,7 @@ comptime {
     @export_symbol(ptr_res, "res");
 
     @export_symbol(init_task);
-    @export_symbol(shift_host);
+    @export_symbol(resize_host);
 
     @export_symbol(ptr_time_memcpy, "time_memcpy");
 }
